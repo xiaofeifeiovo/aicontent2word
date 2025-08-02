@@ -8,13 +8,19 @@ from datetime import datetime
 
 def convert_math_blocks(md_content):
     """
-    Convert ```math blocks to appropriate LaTeX format that pandoc can recognize.
+    Convert various math block formats to appropriate LaTeX format that pandoc can recognize.
     
-    For single line math expressions, convert to $...$ format.
-    For multi-line math expressions, convert to $$...$$ format.
+    Supported formats:
+    - ```math blocks (converted to $...$ or $$...$$)
+    - \(...\) inline math (converted to $...$)
+    - \[...\] display math (converted to $$...$$)
     """
-    def replace_math_block(match):
+    print("Converting math blocks...")
+    
+    # Pattern to match ```math blocks
+    def replace_code_math_block(match):
         math_content = match.group(1).strip()
+        print(f"Found ```math block: {math_content[:50]}...")
         
         # Check if it's a single line or multi-line
         lines = math_content.split('\n')
@@ -24,19 +30,56 @@ def convert_math_blocks(md_content):
         
         if len(lines) == 1:
             # Single line - use $...$ format
-            return f"${lines[0]}$"
+            result = f"${lines[0]}$"
+            print(f"Converted to inline math: {result}")
+            return result
         else:
             # Multi-line - use $$...$$ format
             inner_content = '\n'.join(lines)
-            return f"$${inner_content}$$"
+            result = f"$${inner_content}$$"
+            print(f"Converted to block math: {result[:50]}...")
+            return result
     
-    # Pattern to match ```math blocks
-    pattern = r'```math\s*(.*?)\s*```'
+    # Pattern to match \[...\] blocks (display math)
+    def replace_display_math_block(match):
+        math_content = match.group(1).strip()
+        print(f"Found display math block: {math_content[:50]}...")
+        # Convert to $$...$$ format
+        result = f"$${math_content}$$"
+        print(f"Converted to block math: {result[:50]}...")
+        return result
     
-    # Replace all matches
-    converted_content = re.sub(pattern, replace_math_block, md_content, flags=re.DOTALL)
+    # Pattern to match \(...\) blocks (inline math)
+    def replace_inline_math_block(match):
+        math_content = match.group(1).strip()
+        print(f"Found inline math block: {math_content}")
+        # Convert to $...$ format
+        result = f"${math_content}$"
+        print(f"Converted to inline math: {result}")
+        return result
     
-    return converted_content
+    # Keep track of conversions
+    original_content = md_content
+    
+    # Replace ```math blocks
+    pattern_code = r'```math\s*(.*?)\s*```'
+    md_content = re.sub(pattern_code, replace_code_math_block, md_content, flags=re.DOTALL)
+    
+    # Replace \[...\] blocks (display math)
+    pattern_display = r'\\\[\s*(.*?)\s*\\\]'
+    md_content = re.sub(pattern_display, replace_display_math_block, md_content, flags=re.DOTALL)
+    
+    # Replace \(...\) blocks (inline math)
+    pattern_inline = r'\\\(\s*(.*?)\s*\\\)'
+    md_content = re.sub(pattern_inline, replace_inline_math_block, md_content, flags=re.DOTALL)
+    
+    # Check if any conversions were made
+    if md_content != original_content:
+        print("Math blocks were converted")
+    else:
+        print("No math blocks found to convert")
+    
+    return md_content
 
 def is_markdown(content):
     """
@@ -129,13 +172,14 @@ def convert_clipboard_to_docx():
         print(f"Created temporary Markdown file: {md_path}")
         
         try:
-            # Run pandoc to convert MD to DOCX
-            print("Running pandoc conversion...")
+            # Run pandoc to convert MD to DOCX with math support
+            print("Running pandoc conversion with math support...")
             result = subprocess.run([
                 'pandoc', 
                 md_path, 
                 '-o', 
-                output_path
+                output_path,
+                '--mathml'  # Enable MathML for better math rendering in Word
             ], capture_output=True, text=True, timeout=30)
             
             if result.returncode != 0:
